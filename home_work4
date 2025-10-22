@@ -1,0 +1,58 @@
+from db import main_db
+import flet as ft
+
+def main(page: ft.Page):
+    page.title = "ToDo List"
+    page.theme_mode = ft.ThemeMode.LIGHT
+
+    task_list = ft.Column()
+    empty_text = ft.Text("Тут ничего нет", visible=False)
+
+    def refresh_tasks():
+        tasks = main_db.get_tasks()
+        task_list.controls = [create_task_row(id, text) for id, text in tasks]
+        empty_text.visible = not tasks
+        page.update()
+
+    def create_task_row(task_id, text):
+        field = ft.TextField(value=text, read_only=True, expand=True)
+
+        def edit(_):
+            field.read_only = False
+            field.update()
+
+        def save(_):
+            main_db.update_task(task_id, field.value)
+            field.read_only = True
+            field.update()
+
+        return ft.Row([field,
+                       ft.IconButton(icon=ft.Icons.EDIT, on_click=edit),
+                       ft.IconButton(icon=ft.Icons.SAVE, on_click=save)])
+
+    def add_task(_):
+        if task_input.value:
+            task_id = main_db.add_task(task_input.value)
+            task_list.controls.append(create_task_row(task_id, task_input.value))
+            task_input.value = ""
+            empty_text.visible = False
+            page.update()
+
+    def delete_last(_):
+        if task_list.controls:
+            last = task_list.controls.pop()
+            main_db.delete_last_task()
+            if not task_list.controls:
+                empty_text.visible = True
+            page.update()
+
+    task_input = ft.TextField(label="Введите задачу", expand=True)
+    add_btn = ft.ElevatedButton("Добавить", on_click=add_task)
+    del_btn = ft.ElevatedButton("Удалить последнее", on_click=delete_last)
+
+    page.add(ft.Row([task_input, add_btn, del_btn]), empty_text, task_list)
+    refresh_tasks()
+
+if __name__ == "__main__":
+    main_db.init_db()
+    ft.app(target=main)
